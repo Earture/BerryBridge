@@ -29,6 +29,23 @@ jobs:
           BERRYBRIDGE_FORCE_SMB_BUNDLE: '1'
         run: node scripts/bundle-smb-tools.js
 
+      - name: Validate macOS Samba bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DIR="resources/samba/darwin-$(node -p 'process.arch')"
+
+          test -x "$DIR/smbclient"
+
+          if [ -n "$(find "$DIR" -type l -print -quit)" ]; then
+            echo "ERROR: Symlinks found in bundled Samba directory:"
+            find "$DIR" -type l -exec ls -l {} \;
+            exit 1
+          fi
+
+          echo "Samba bundle validated."
+
       - run: npm run build
 
       - name: Build macOS installers
