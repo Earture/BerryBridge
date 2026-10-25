@@ -57,7 +57,7 @@ for (const [share, directory] of [
     const result = await client.provisionSshKey('phone', share, 'test-password', key, 'blackberry')
     const prefix = directory ? directory + '/' : ''
     assert.deepEqual(uploads.map(u => u.remote), [prefix + 'id_rsa_bb10.pub', prefix + 'term49-ssh-key-install.txt'])
-    assert.match(uploads[1].contents, /cat \/accounts\/1000\/shared\/documents\/id_rsa_bb10.pub/)
+    assert.ok(uploads[1].contents.includes("cat '/accounts/1000/shared/documents/id_rsa_bb10.pub'"))
     assert.equal(result.keyFileName, 'id_rsa_bb10.pub')
     assert.equal(fs.existsSync(uploads[1].local), false)
   }))
@@ -82,3 +82,52 @@ test('failed script upload removes the temporary script', () => withClient(async
   assert.ok(script)
   assert.equal(fs.existsSync(script), false)
 }))
+
+const { spawnSync } = require('node:child_process')
+const { DEVICE_PATHS } = load(path.join(root, 'src/shared/types.ts'))
+const { term49AuthorizedKeysCommands } = load(path.join(root, 'src/shared/ssh-install-commands.ts'))
+
+for (const scenario of ['success', 'permission denied', 'missing HOME', 'missing public key']) {
+  test(`Term49 script: ${scenario}`, { skip: process.platform === 'win32' }, () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'berrybridge-shell-test-'))
+    const userHome = path.join(temp, 'Term49 home')
+    const bin = path.join(temp, 'bin')
+    const docs = path.join(temp, 'documents')
+    const install = path.join(temp, 'berrycore')
+    const originalInstall = DEVICE_PATHS.berrycore.defaultInstall
+    const originalDocs = DEVICE_PATHS.berrycore.transferDir
+    try {
+      for (const dir of [userHome, bin, docs, install]) fs.mkdirSync(dir)
+      fs.writeFileSync(path.join(install, 'env.sh'), ':\n')
+      const pubName = "id_rsa user's.pub"
+      if (scenario !== 'missing public key') fs.writeFileSync(path.join(docs, pubName), 'ssh-rsa TEST\n')
+      fs.writeFileSync(path.join(bin, 'ssh-keygen'), '#!/bin/sh\nwhile [ "$#" -gt 0 ]; do\n if [ "$1" = "-f" ]; then shift; touch "$1"; exit; fi\n shift\ndone\nexit 1\n', { mode: 0o755 })
+      fs.writeFileSync(path.join(bin, 'sshd'), '#!/bin/sh\ntouch "$HOME/sshd-started"\n', { mode: 0o755 })
+      if (scenario === 'permission denied') {
+        fs.writeFileSync(path.join(bin, 'mkdir'), '#!/bin/sh\necho "Permission denied" >&2\nexit 1\n', { mode: 0o755 })
+      }
+      DEVICE_PATHS.berrycore.defaultInstall = install
+      DEVICE_PATHS.berrycore.transferDir = docs
+      const script = term49AuthorizedKeysCommands(pubName)
+      const env = { ...process.env, HOME: scenario === 'missing HOME' ? '' : userHome, PATH: bin + ':' + process.env.PATH }
+      const result = spawnSync('/bin/sh', ['-c', script], { env, encoding: 'utf8' })
+      if (scenario === 'success') {
+        assert.equal(result.status, 0, result.stderr)
+        assert.equal(fs.readFileSync(path.join(userHome, '.ssh/authorized_keys'), 'utf8'), 'ssh-rsa TEST\n')
+        assert.equal(fs.statSync(path.join(userHome, '.ssh')).mode & 0o777, 0o700)
+        assert.equal(fs.statSync(path.join(userHome, '.ssh/authorized_keys')).mode & 0o777, 0o600)
+        assert.ok(fs.existsSync(path.join(userHome, 'sshd-started')))
+      } else {
+        assert.notEqual(result.status, 0)
+        assert.equal(fs.existsSync(path.join(userHome, 'sshd-started')), false)
+        assert.equal(fs.existsSync(path.join(userHome, '.ssh/authorized_keys')), false)
+        const interactive = spawnSync('/bin/sh', ['-c', script + '\nprintf "session alive"'], { env, encoding: 'utf8' })
+        assert.match(interactive.stdout, /session alive/)
+      }
+    } finally {
+      DEVICE_PATHS.berrycore.defaultInstall = originalInstall
+      DEVICE_PATHS.berrycore.transferDir = originalDocs
+      fs.rmSync(temp, { recursive: true, force: true })
+    }
+  })
+}
