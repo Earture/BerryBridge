@@ -1,6 +1,6 @@
 {
   "name": "berrybridge",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Berry Bridge — Desktop Management of BerryCore Devices",
   "main": "./out/main/index.js",
   "author": "BerryCore Community <berrycore@users.noreply.github.com>",
@@ -85,12 +85,16 @@
       {
         "from": "resources/samba",
         "to": "samba",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/berrybridge-agent",
         "to": "berrybridge-agent",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
@@ -98,11 +102,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
       "category": "public.app-category.developer-tools"
@@ -121,7 +131,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
