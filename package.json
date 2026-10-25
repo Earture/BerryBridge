@@ -1,6 +1,6 @@
 {
   "name": "berrybridge",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Berry Bridge — Desktop Management of BerryCore Devices",
   "main": "./out/main/index.js",
   "author": "BerryCore Community <berrycore@users.noreply.github.com>",
@@ -98,6 +98,10 @@
       }
     ],
     "mac": {
+      "sign": "scripts/sign-macos-app.js",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "Berry Bridge connects to your BlackBerry over the local network for WiFi Storage and device management."
+      },
       "icon": "build/icon.icns",
       "target": [
         {
