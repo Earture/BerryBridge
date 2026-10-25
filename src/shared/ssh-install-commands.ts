@@ -16,26 +16,17 @@ export function pubKeyFileName(keyPathOrName: string): string {
 
 /** Shell commands to run in Term49 after uploading *.pub via WiFi Storage. */
 export function term49AuthorizedKeysCommands(pubFileName: string): string {
+  const { sshDir, authorizedKeys } = DEVICE_PATHS.ssh
   const setupDir = DEVICE_PATHS.berrycore.transferDir
   const berrycore = DEVICE_PATHS.berrycore.defaultInstall
-  const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`
   return [
-    // A subshell stops on failure without exiting the user's Term49 session.
-    '(',
-    'set -e',
-    'umask 077',
-    `test -r ${quote(`${berrycore}/env.sh`)} || { echo "BerryCore env.sh is not readable." >&2; exit 1; }`,
-    `. ${quote(`${berrycore}/env.sh`)}`,
-    'test -n "$HOME" && test -d "$HOME" || { echo "Term49 HOME is missing or unavailable." >&2; exit 1; }',
-    'berrybridge_ssh_dir="$HOME/.ssh"',
-    `test -r ${quote(`${setupDir}/${pubFileName}`)} || { echo "Uploaded public key is not readable in Documents." >&2; exit 1; }`,
-    'mkdir -p "$berrybridge_ssh_dir" || { echo "Cannot create $berrybridge_ssh_dir. Check Term49 directory permissions." >&2; exit 1; }',
-    'chmod 700 "$berrybridge_ssh_dir"',
-    'test -f "$berrybridge_ssh_dir/id_rsa" || ssh-keygen -t rsa -b 2048 -f "$berrybridge_ssh_dir/id_rsa" -N ""',
-    `cat ${quote(`${setupDir}/${pubFileName}`)} >> "$berrybridge_ssh_dir/authorized_keys"`,
-    'chmod 600 "$berrybridge_ssh_dir/authorized_keys"',
-    'sshd',
-    ')'
+    `source ${berrycore}/env.sh`,
+    `mkdir -p ${sshDir}`,
+    `chmod 700 ${sshDir}`,
+    `test -f ${sshDir}/id_rsa || ssh-keygen -t rsa -b 2048 -f ${sshDir}/id_rsa -N ""`,
+    `cat ${setupDir}/${pubFileName} >> ${authorizedKeys}`,
+    `chmod 600 ${authorizedKeys}`,
+    'sshd'
   ].join('\n')
 }
 
@@ -49,6 +40,6 @@ export function term49ManualInstallMessage(pubFileName: string): string {
   const dir = DEVICE_PATHS.berrycore.transferDir
   return `Uploaded ${pubFileName} and ${TERM49_SSH_KEY_SCRIPT} to ${dir}/ via WiFi Storage.
 
-Finish on the phone: open ${TERM49_SSH_KEY_SCRIPT} in ${dir}, copy all, paste into Term49 (meta mode + Ctrl+V), and run. The script uses Term49's $HOME/.ssh, runs ssh-keygen if needed, adds your Mac key to authorized_keys, and starts sshd. If a step fails, it stops without closing Term49. Then test SSH again in Berry Bridge.`
+Finish on the phone: open ${TERM49_SSH_KEY_SCRIPT} in ${dir}, copy all, paste into Term49 (meta mode + Ctrl+V), and run. The script runs ssh-keygen on the device, adds your Mac key to authorized_keys, and starts sshd. Then test SSH again in Berry Bridge.`
 }
 
